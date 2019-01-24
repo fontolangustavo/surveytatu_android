@@ -31,6 +31,13 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.facebook.AccessToken;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
@@ -47,8 +54,10 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static android.Manifest.permission.READ_CONTACTS;
@@ -58,13 +67,9 @@ import static android.Manifest.permission.READ_CONTACTS;
  */
 public class LoginActivity extends AppCompatActivity {
 
-    // UI references.
-    private AutoCompleteTextView mEmailView;
-    private EditText mPasswordView;
-    private View mProgressView;
-    private View mLoginFormView;
     private CallbackManager callbackManager;
     private LoginButton loginButton;
+    private String api_url = "https://APIURL/login";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,8 +94,6 @@ public class LoginActivity extends AppCompatActivity {
                 parameters.putString("fields", "id,name,email");
                 request.setParameters(parameters);
                 request.executeAsync();
-
-                Log.d("teste", "work");
             }
 
 
@@ -110,10 +113,14 @@ public class LoginActivity extends AppCompatActivity {
         });
 
 
-        if(this.isLoggedIn()){
-            Intent intent = new Intent(LoginActivity.this.getApplication(), SurveyActivity.class);
-            startActivity(intent);
-            LoginActivity.this.finish();
+        if (this.isLoggedIn()) {
+            GraphRequest request = GraphRequest.newMeRequest(
+                    AccessToken.getCurrentAccessToken(), LoginActivity.this.requestInformation());
+
+            Bundle parameters = new Bundle();
+            parameters.putString("fields", "id,name,email");
+            request.setParameters(parameters);
+            request.executeAsync();
         }
     }
 
@@ -122,7 +129,7 @@ public class LoginActivity extends AppCompatActivity {
         return accessToken != null;
     }
 
-    private GraphRequest.GraphJSONObjectCallback requestInformation(){
+    private GraphRequest.GraphJSONObjectCallback requestInformation() {
         return new GraphRequest.GraphJSONObjectCallback() {
             @Override
             public void onCompleted(JSONObject object, GraphResponse response) {
@@ -130,13 +137,12 @@ public class LoginActivity extends AppCompatActivity {
                 try {
                     fullName = object.getString("name");
                     email = object.getString("email");
-                    Intent intent = new Intent(LoginActivity.this.getApplication(), SurveyActivity.class);
-                    startActivity(intent);
-                    LoginActivity.this.finish();
 
-                    Log.d("JSONerror", email + ' ' + fullName);
+                    LoginActivity.this.loginToGetToken(email);
+
+                    Log.d("JSON => ", email + ' ' + fullName);
                 } catch (JSONException e) {
-                    Log.d("JSONerror",e.toString());
+                    Log.d("JSONerror", e.toString());
                 }
             }
         };
@@ -147,6 +153,55 @@ public class LoginActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         callbackManager.onActivityResult(requestCode, resultCode, data);
         super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    private void loginToGetToken(final String email) {
+        StringRequest getRequest = new StringRequest(Request.Method.POST, this.api_url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        try {
+
+                            JSONObject obj = new JSONObject(response);
+
+                            Log.d("Response success", "response obj => " + response);
+
+                            Intent intent = new Intent(LoginActivity.this.getApplication(), SurveyActivity.class);
+
+                            Bundle b = new Bundle();
+                            b.putString("token", obj.getString("token"));
+                            intent.putExtras(b);
+
+                            startActivity(intent);
+
+                            LoginActivity.this.finish();
+                        } catch (Exception e) {
+
+                            e.printStackTrace();
+                        }
+
+                    }
+                },
+                new Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        // TODO Auto-generated method stub
+                        Log.d("ERROR", "error => " + error.toString());
+                    }
+                }
+        ) {
+
+            @Override
+            protected Map<String, String> getParams() {
+                Map<String, String> params = new HashMap<String, String>();
+                params.put("email", email);
+                return params;
+            }
+
+        };
+
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+        requestQueue.add(getRequest);
     }
 
 }

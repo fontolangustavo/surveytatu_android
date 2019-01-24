@@ -29,22 +29,27 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class SurveyActivity extends AppCompatActivity {
-    String api_url = "http://fontolan.us1-host.cloudfera.com/questions";
-    String token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjMzOTAsImlhdCI6MTU0ODE3MTgxMn0.VYmHyWrKFjSsUq4OXu6nGBZ0bgVZp-0kNWB6ZBdY9h4";
+    private String api_url = "https://APIURL/questions";
+    private String token = "";
+    private Button btn;
+    private JSONArray questions;
 
-    JSONArray questions;
-
-    ArrayList<EditText> questions_text = new ArrayList<EditText>();
+    private ArrayList<EditText> questions_text = new ArrayList<EditText>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_survey);
+
+        Bundle b = getIntent().getExtras();
+        this.token = b.getString("token");
+        this.btn = (Button) findViewById(R.id.btn_enviar);
+
         try {
             this.getQuestions();
 
         } catch (Exception e) {
-
+            Log.d("getQuestions Exception", e.getMessage());
         }
     }
 
@@ -55,7 +60,7 @@ public class SurveyActivity extends AppCompatActivity {
                     public void onResponse(String response) {
                         try {
 
-                            Log.d("ERROR", "error => " + response);
+                            Log.d("onResponse", "response => " + response);
                             SurveyActivity.this.questions = new JSONArray(response);
                             SurveyActivity.this.listQuestions();
                         } catch (JSONException e) {
@@ -84,19 +89,20 @@ public class SurveyActivity extends AppCompatActivity {
         requestQueue.add(getRequest);
     }
 
-    private updateQuestions(){
+    private void updateQuestions(){
         StringRequest getRequest = new StringRequest(Request.Method.POST, this.api_url,
                 new Response.Listener<String>() {
                     @Override
                     public void onResponse(String response) {
                         try {
 
-                            Log.d("ERROR", "error => " + response);
-                            SurveyActivity.this.questions = new JSONArray(response);
-                            SurveyActivity.this.listQuestions();
-                        } catch (JSONException e) {
+                            Log.d("Response success", "response obj => " + response);
+                        } catch (Exception e) {
+
                             e.printStackTrace();
                         }
+
+                        SurveyActivity.this.btn.setEnabled(true);
                     }
                 },
                 new Response.ErrorListener() {
@@ -104,13 +110,24 @@ public class SurveyActivity extends AppCompatActivity {
                     public void onErrorResponse(VolleyError error) {
                         // TODO Auto-generated method stub
                         Log.d("ERROR", "error => " + error.toString());
+                        SurveyActivity.this.btn.setEnabled(true);
                     }
                 }
         ) {
+
+            @Override
+            protected Map<String,String> getParams(){
+                Map<String,String> params = new HashMap<String, String>();
+                Log.d("questions json", SurveyActivity.this.toStringArray(SurveyActivity.this.questions));
+                params.put("data", SurveyActivity.this.toStringArray(SurveyActivity.this.questions));
+                return params;
+            }
+
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
                 Map<String, String> params = new HashMap<String, String>();
                 params.put("Authorization", "Bearer " + SurveyActivity.this.token);
+//                params.put("Content-Type", "application/json; charset=utf-8");
 
                 return params;
             }
@@ -152,23 +169,42 @@ public class SurveyActivity extends AppCompatActivity {
     }
 
     public void salvarDados(View v) {
-        Button btn = (Button) findViewById(R.id.btn_enviar);
-        btn.setEnabled(false);
+        this.btn.setEnabled(false);
         for (int i = 0; i < questions_text.size(); i++) {
             try {
                 JSONObject obj = (JSONObject) questions.get(i);
 
-                obj.put("value", questions_text.get(i).getText().toString());
+                obj.put("value", questions_text.get(i).getText().toString() != ""? questions_text.get(i).getText().toString() : null);
 
                 questions.put(i, obj);
-
             } catch (JSONException e) {
                 e.printStackTrace();
             }
         }
 
-        Log.d("Questions", questions.toString());
+        this.updateQuestions();
 
-        btn.setEnabled(true);
+        Log.d("Questions", questions.toString());
     }
+
+    public  String toStringArray(JSONArray array) {
+        if(array==null)
+            return null;
+
+        String arr = "[";
+        for(int i=0; i < array.length(); i++) {
+            try {
+                if(i < array.length() - 1){
+                    arr += array.getJSONObject(i).toString() + ",";
+                }else{
+                    arr += array.getJSONObject(i).toString();
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
+
+        return arr + "]";
+    }
+
 }
